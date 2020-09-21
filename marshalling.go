@@ -2,6 +2,7 @@ package gotils
 
 import (
 	"encoding/json"
+
 	"reflect"
 )
 
@@ -31,7 +32,13 @@ func MarshalWithCasts(b []byte, emptyObj interface{}, castFns CastMap) (interfac
 
 	for i := 0; i < ttype.NumField(); i++ {
 		ft := t.Field(i)
+
 		fv := reflect.ValueOf(obj).Elem().Field(i)
+
+		if !fv.CanSet() || fv.Interface() == nil {
+			continue
+		}
+
 		if fn, ok := castFns[ft.Name]; ok {
 			s, err := fn(fv.Interface())
 			if err != nil {
@@ -40,7 +47,12 @@ func MarshalWithCasts(b []byte, emptyObj interface{}, castFns CastMap) (interfac
 			fv = reflect.ValueOf(s)
 		}
 
-		newObj.Field(i).Set(fv)
+		nfv := newObj.Field(i)
+
+		// Should probably alwasy be true?
+		if nfv.CanSet() {
+			nfv.Set(fv)
+		}
 	}
 
 	return newObj.Interface(), nil

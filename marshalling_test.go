@@ -9,7 +9,12 @@ import (
 )
 
 func GimmeString(i interface{}) (interface{}, error) {
-	return fmt.Sprint(i), nil
+	switch i.(type) {
+	case nil:
+		return nil, nil
+	default:
+		return fmt.Sprint(i), nil
+	}
 }
 func GimmeTime(i interface{}) (interface{}, error) {
 	switch i.(type) {
@@ -25,7 +30,7 @@ func GimmeTime(i interface{}) (interface{}, error) {
 }
 
 type MixedType struct {
-	Phone     string    `json:"phone"`
+	Phone     string    `json:"phone,omitempty"`
 	Country   string    `json:"country"`
 	Amount    float64   `json:"amount,omitempty"`
 	Timestamp time.Time `json:"timestamp"`
@@ -44,6 +49,43 @@ func TestMarshalWithCastsCastingMultipleFuncs(t *testing.T) {
 	b, _ := json.Marshal(mt)
 
 	assert.Equal(t, `{"phone":"50","country":"ES","amount":200,"timestamp":"2020-01-01T00:00:00Z"}`, string(b))
+}
+
+func TestMarshalWithZeroValues(t *testing.T) {
+	castFns := map[string]func(interface{}) (interface{}, error){
+		"Phone":     GimmeString,
+		"Timestamp": GimmeTime,
+	}
+
+	j := []byte(`{"country":"ES","Timestamp":"2020-01-01","amount":200}`)
+
+	newObj, _ := MarshalWithCasts(j, MixedType{}, castFns)
+	mt := newObj.(MixedType)
+	b, _ := json.Marshal(mt)
+
+	assert.Equal(t, `{"country":"ES","amount":200,"timestamp":"2020-01-01T00:00:00Z"}`, string(b))
+}
+
+type SecretType struct {
+	Phone     string `json:"phone,omitempty"`
+	country   string
+	Amount    float64   `json:"amount,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func TestMarshalWithUnexportedFields(t *testing.T) {
+	castFns := map[string]func(interface{}) (interface{}, error){
+		"Phone":     GimmeString,
+		"Timestamp": GimmeTime,
+	}
+
+	j := []byte(`{"Timestamp":"2020-01-01","amount":200}`)
+
+	newObj, _ := MarshalWithCasts(j, SecretType{}, castFns)
+	mt := newObj.(SecretType)
+	b, _ := json.Marshal(mt)
+
+	assert.Equal(t, `{"amount":200,"timestamp":"2020-01-01T00:00:00Z"}`, string(b))
 }
 
 func TestMarshalWithErrorsInCastingFn(t *testing.T) {
